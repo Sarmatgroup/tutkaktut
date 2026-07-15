@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment (САМОЕ ВАЖНОЕ - не грузим тяжелые библиотеки)
+venv/
+env/
+.env/
+
+# Django
+db.sqlite3
+media/
+
+# Secrets (Никогда не грузим пароли!)
+.env
+.DS_Store

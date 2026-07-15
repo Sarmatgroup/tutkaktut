@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кабинет Курьера</title>
+    
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #f5f5f5; overflow: hidden; }
+        
+        /* Стили карты */
+        #map { width: 100%; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1;filter: invert(1) hue-rotate(180deg);}
+        
+        /* Скрываем любые всплывающие технические панели Яндекса, если они появятся */
+        .ymaps-2-1-79-route-panel, .ymaps-2-1-79-inputs-box {
+            display: none !important;
+        }
+        
+        /* Главные кнопки смены */
+        .shift-container { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; width: 90%; max-width: 420px; }
+        .shift-btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 16px; font-weight: bold; color: white; cursor: pointer; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: background 0.2s; }
+        .btn-go-online { background-color: #2d8b4e; } 
+        .btn-go-offline { background-color: #b32d2d; } 
+
+        /* Бургер-меню */
+        .menu-trigger { position: absolute; top: 15px; left: 15px; z-index: 10; background: #151515; color: #15ff00; border: none; padding: 12px; border-radius: 8px; box-shadow: 0 0 10px 2px rgba(30, 255, 0, 0.942); cursor: pointer; font-size: 20px; }
+        .sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #151515; z-index: 20; transition: left 0.3s ease; box-shadow: 2px 0 5px rgba(30, 255, 0, 0.942); padding: 20px; box-sizing: border-box; }
+        .sidebar.open { left: 0; }
+        .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: 15; display: none; }
+        .sidebar-overlay.show { display: block; }
+        
+        /* Кнопка истории */
+        .history-toggle-btn { background: none; border: 1px solid #15ff00; padding: 10px; border-radius: 8px; font-size: 16px; color: #15ff00; cursor: pointer; text-align: center; margin: 15px 0 10px 0; font-weight: bold; display: block; text-decoration: none; outline: none; }
+        
+        /* ИЗМЕНЕНО: Добавлен принудительный перенос текста для элементов истории */
+        .history-item { padding: 10px; border-bottom: 1px solid #151515; font-size: 13px; margin-top: 5px; color: #15ff00; word-wrap: break-word; white-space: normal; }
+        
+        /* Карточка заказа */
+        .order-popup { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 420px; background: #151515; border-radius: 16px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 10; box-sizing: border-box; display: none; }
+        .order-popup.show { display: block; }
+        .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .order-id { font-size: 20px; font-weight: bold; color: #222; }
+        .order-price { font-size: 20px; font-weight: bold; color: #28a745; }
+        
+        /* ИЗМЕНЕНО: Добавлен принудительный перенос текста для адресов в окне заказа */
+        .address-block { margin-bottom: 8px; font-size: 14px; color: #444; line-height: 1.4; word-wrap: break-word; white-space: normal; }
+        
+        .comment-box { margin-top: 10px; font-style: italic; color: #666; font-size: 13px; background: #f9f9f9; padding: 5px; border-radius: 4px; }
+        
+        /* Кнопки действий */
+        .actions-group { display: flex; gap: 10px; margin-top: 15px; }
+        .btn { flex: 1; padding: 14px; border-radius: 10px; border: none; font-weight: bold; font-size: 14px; cursor: pointer; text-align: center; }
+        .btn-decline { background: #8e8e93; color: white; }
+        .btn-map { background: #007bff; color: white; transition: all 0.2s; }
+        .btn-accept { background: #1b8a4c; color: white; }
+        .btn-transit { background: #ffc107; color: #222; width: 100%; margin-top: 15px; }
+        .btn-complete { background: #28a745; color: white; width: 100%; margin-top: 15px; }
+        .btn-back { background: #6c757d; color: white; width: 100%; margin-top: 15px; }
+        
+        .map-error-info { color: #b32d2d; font-size: 12px; margin-top: 10px; display: none; background: #fdf2f2; padding: 8px; border-radius: 6px; border: 1px dashed #b32d2d; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <button class="menu-trigger" onclick="toggleSidebar()">☰</button>
+    <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <div id="sidebar" class="sidebar">
+        <h3 style="margin-bottom: 5px;">{{ request.user.first_name|default:"Имя курьера" }}</h3>
+        <p style="margin-top: 0; color: #555;">Мой баланс: <strong id="menuBalance">0</strong> ₽</p>
+        <hr>
+        <button class="history-toggle-btn" onclick="toggleHistory()">История заказов</button>
+        <div id="historyList" class="hidden"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="orderPopup" class="order-popup">
+        <div class="order-header">
+            <div id="popupOrderId" class="order-id">Заказ №--</div>
+            <div id="popupPrice" class="order-price">0 ₽</div>
+        </div>
+        <div class="address-block"><strong>Откуда:</strong> <span id="popupFrom">Загрузка...</span></div>
+        <div class="address-block"><strong>Куда:</strong> <span id="popupTo">Загрузка...</span></div>
+        <div id="popupCommentBox" class="comment-box"></div>
+        
+        <div id="initialActions" class="actions-group">
+            <button class="btn btn-decline" onclick="refuseOrder()">Отказаться</button>
+            <button id="mapBtn" class="btn btn-map" onclick="showRouteOnMap()">На карте</button>
+            <button class="btn btn-accept" onclick="acceptOrder()">Принять</button>
+        </div>
+
+        <div id="mapErrorInfo" class="map-error-info"></div>
+
+        <button id="btnTransit" class="btn btn-transit hidden" onclick="startTransit()">Забрал заказ</button>
+        <button id="btnComplete" class="btn btn-complete hidden" onclick="completeOrder()">Доставлен</button>
+        
+        <button id="btnBackToHistory" class="btn btn-back hidden" onclick="goBackToHistory()">Назад</button>
+    </div>
+
+    <div class="shift-container">
+        <button id="shiftBtn" class="shift-btn btn-go-online" onclick="toggleShift()">Выйти на линию</button>
+    </div>
+
+    <script>
+        let isOnline = false;
+        let pollingInterval = null;
+        let currentOrder = null; 
+        let ignoredOrderIds = []; 
+        let yandexMap = null;
+        let currentRoute = null;
+
+        // Инициализация Яндекс.Карт БЕЗ кнопок
+        ymaps.ready(initMap);
+
+        function initMap() {
+            // Центрируем на Гусев, вырезаем все стандартные элементы управления через controls: []
+            yandexMap = new ymaps.Map("map", {
+                center: [54.5910, 22.1997],
+                zoom: 14,
+                controls: [] // Убирает поиск, слои, пробки, линейки и прочий мусор
+            });
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebarOverlay').classList.toggle('show');
+            if(document.getElementById('sidebar').classList.contains('open')) {
+                updateBalanceView();
+            }
+        }
+
+        function toggleHistory() {
+            const list = document.getElementById('historyList');
+            if (list.classList.contains('hidden')) {
+                list.classList.remove('hidden');
+                loadHistory();
+            } else {
+                list.classList.add('hidden');
+            }
+        }
+
+        function updateBalanceView() {
+            fetch('/courier/history/')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('menuBalance').innerText = data.balance;
+            });
+        }
+
+        function loadHistory() {
+            const list = document.getElementById('historyList');
+            list.innerHTML = '<p style="font-size:12px; color:#999;">Загрузка...</p>';
+            fetch('/courier/history/')
+            .then(res => res.json())
+            .then(data => {
+                list.innerHTML = '';
+                if(data.history.length === 0) {
+                    list.innerHTML = '<p style="padding:5px; color:#777; font-size:13px;">История пуста</p>';
+                    return;
+                }
+                data.history.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'history-item';
+                    div.style.cursor = 'pointer'; // Делает визуально кликабельным
+                    div.innerHTML = `
+                        <strong>Заказ №${item.id} (+${item.final_price} ₽)</strong><br>
+                        <span>${item.address_from} &rarr; ${item.address_to}</span>
+                    `;
+                    // По клику на заказ открываем окно отчета
+                    div.onclick = () => showHistoryReport(item);
+                    list.appendChild(div);
+                });
+            });
+        }
+
+        // Функция для показа отчета из истории
+        function showHistoryReport(order) {
+            currentOrder = order;
+            document.getElementById('popupOrderId').innerText = `Заказ №${order.id} (Архив)`;
+            document.getElementById('popupPrice').innerText = `${order.final_price} ₽`;
+            document.getElementById('popupFrom').innerText = order.address_from;
+            document.getElementById('popupTo').innerText = order.address_to;
+            
+            const commBox = document.getElementById('popupCommentBox');
+            commBox.innerText = order.comment ? `Комментарий: "${order.comment}"` : '';
+
+            // Скрываем рабочие кнопки
+            document.getElementById('initialActions').classList.add('hidden');
+            document.getElementById('btnTransit').classList.add('hidden');
+            document.getElementById('btnComplete').classList.add('hidden');
+            document.getElementById('mapErrorInfo').style.display = 'none';
+
+            // Показываем кнопку "Назад"
+            document.getElementById('btnBackToHistory').classList.remove('hidden');
+
+            // Сворачиваем бургер-меню
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('show');
+
+            // Показываем карточку заказа
+            document.getElementById('orderPopup').classList.add('show');
+        }
+
+        // Функция для кнопки "Назад"
+        function goBackToHistory() {
+            // Закрываем окно заказа
+            document.getElementById('orderPopup').classList.remove('show');
+            document.getElementById('btnBackToHistory').classList.add('hidden');
+            currentOrder = null;
+
+            // Возвращаем бургер-меню обратно
+            document.getElementById('sidebar').classList.add('open');
+            document.getElementById('sidebarOverlay').classList.add('show');
+        }
+
+        function toggleShift() {
+            const btn = document.getElementById('shiftBtn');
+            if (!isOnline) {
+                isOnline = true;
+                btn.innerText = 'Уйти с линии';
+                btn.className = 'shift-btn btn-go-offline'; 
+                startPolling();
+            } else {
+                isOnline = false;
+                btn.innerText = 'Выйти на линию';
+                btn.className = 'shift-btn btn-go-online'; 
+                stopPolling();
+                hideOrderPopup();
+                clearMapRoute();
+            }
+        }
+
+        function startPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(() => {
+                if (!isOnline || currentOrder) return;
+
+                fetch('/courier/available-orders/')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.orders.length > 0) {
+                        let validOrder = data.orders.find(o => !ignoredOrderIds.includes(Number(o.id)));
+                        if (validOrder) {
+                            currentOrder = validOrder;
+                            showOrderPopup(validOrder);
+                        }
+                    }
+                })
+                .catch(err => console.error("Ошибка сети:", err));
+            }, 3000);
+        }
+
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        }
+
+        function showOrderPopup(order) {
+            document.getElementById('popupOrderId').innerText = `Заказ №${order.id}`;
+            document.getElementById('popupPrice').innerText = `${order.final_price} ₽`;
+            document.getElementById('popupFrom').innerText = order.address_from;
+            document.getElementById('popupTo').innerText = order.address_to;
+            
+            const commBox = document.getElementById('popupCommentBox');
+            commBox.innerText = order.comment ? `Комментарий: "${order.comment}"` : '';
+
+            document.getElementById('initialActions').classList.remove('hidden');
+            document.getElementById('btnTransit').classList.add('hidden');
+            document.getElementById('btnComplete').classList.add('hidden');
+            document.getElementById('mapErrorInfo').style.display = 'none';
+
+            // Прячем кнопку "Назад", так как это новый заказ, а не из истории
+            const btnBack = document.getElementById('btnBackToHistory');
+            if (btnBack) btnBack.classList.add('hidden');
+
+            document.getElementById('orderPopup').classList.add('show');
+        }
+
+        function hideOrderPopup() {
+            document.getElementById('orderPopup').classList.remove('show');
+            currentOrder = null;
+        }
+
+        function clearMapRoute() {
+            if (yandexMap && currentRoute) {
+                yandexMap.geoObjects.remove(currentRoute);
+                currentRoute = null;
+            }
+        }
+
+        // Построение мультимаршрута Яндекса без текстовых панелей управления
+        function showRouteOnMap() {
+            const mapBtn = document.getElementById('mapBtn');
+            const errorBlock = document.getElementById('mapErrorInfo');
+            
+            if (!yandexMap || !currentOrder) return;
+
+            clearMapRoute();
+            mapBtn.innerText = 'Строим...';
+            errorBlock.style.display = 'none';
+
+            // Создаем встроенный Яндекс-маршрут
+            currentRoute = new ymaps.multiRouter.MultiRoute({
+                referencePoints: [
+                    currentOrder.address_from,
+                    currentOrder.address_to
+                ],
+                params: {
+                    routingMode: 'auto' // Автомобильный маршрут
+                }
+            }, {
+                // Настройки отображения: отключаем системное меню маршрута, оставляем только линию
+                boundsAutoApply: true,
+                routeStrokeWidth: 5,
+                routeStrokeColor: "#007bff",
+                routeActiveStrokeColor: "#007bff"
+            });
+
+            // Добавляем созданный маршрут на чистую карту
+            yandexMap.geoObjects.add(currentRoute);
+
+            // Обработка успешного построения или падения
+            currentRoute.model.events.add('requestsuccess', () => {
+                mapBtn.innerText = 'На карте';
+            });
+
+            currentRoute.model.events.add('requestfail', (error) => {
+                mapBtn.innerText = 'Ошибка ❌';
+                errorBlock.style.display = 'block';
+                errorBlock.innerHTML = '<strong>Ошибка:</strong> Не удалось построить маршрут по адресам.';
+                setTimeout(() => { mapBtn.innerText = 'На карте'; }, 4000);
+            });
+        }
+
+        function refuseOrder() {
+            if (currentOrder) {
+                ignoredOrderIds.push(Number(currentOrder.id));
+            }
+            clearMapRoute();
+            hideOrderPopup();
+        }
+
+        function acceptOrder() {
+            if (!currentOrder) return;
+            
+            fetch(`/order/${currentOrder.id}/update/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'accepted' })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('initialActions').classList.add('hidden');
+                    document.getElementById('btnTransit').classList.remove('hidden');
+                    document.getElementById('mapErrorInfo').style.display = 'none';
+                    
+                    showRouteOnMap(); 
+                } else {
+                    alert('Упс! Не удалось занять заказ.');
+                    hideOrderPopup();
+                }
+            })
+            .catch(err => console.error("Ошибка при принятии заказа:", err));
+        }
+
+        function startTransit() {
+            if (!currentOrder) return;
+            
+            fetch(`/order/${currentOrder.id}/update/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'delivered' })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('btnTransit').classList.add('hidden');
+                    document.getElementById('btnComplete').classList.remove('hidden');
+                }
+            });
+        }
+
+        function completeOrder() {
+            if (!currentOrder) return;
+            
+            fetch(`/order/${currentOrder.id}/update/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'completed' })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    clearMapRoute();
+                    hideOrderPopup();
+                    updateBalanceView();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
