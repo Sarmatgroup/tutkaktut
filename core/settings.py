@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-qk_%gu0*o6n+v_n0lxyz5a@kxbrq++p@45_3p&2hj@io6!8zk9
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['195.133.196.34', 'tutkaktutservice.ru', 'www.tutkaktutservice.ru']
 
 
 # Application definition
@@ -116,3 +116,5 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+STATIC_ROOT = '/var/www/tutkaktut/static'
