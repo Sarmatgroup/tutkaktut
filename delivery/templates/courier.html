@@ -2,52 +2,280 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Кабинет Курьера</title>
     
     <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
 
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; background: #f5f5f5; overflow: hidden; }
+        /* ПЕРЕМЕННЫЕ ЦВЕТОВ (Точно такие же, как у клиента) */
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #121212;
+            --card-bg: #ffffff;
+            --sidebar-bg: #f5f5f5;
+            --divider-color: #e0e0e0;
+            --input-bg: #f8fafc;
+            --input-border: #e2e8f0;
+            --tariff-btn-bg: #f8fafc;
+            --tariff-btn-border: #f1f5f9;
+            --summary-bg: #f8fafc;
+        }
+
+        body.dark-theme {
+            --bg-color: #121212;
+            --text-color: #f5f5f5;
+            --card-bg: #1e1e1e;
+            --sidebar-bg: #1e1e1e;
+            --divider-color: #333333;
+            --input-bg: #2d3748;
+            --input-border: #4a5568;
+            --tariff-btn-bg: #2d3748;
+            --tariff-btn-border: #4a5568;
+            --summary-bg: #2d3748;
+        }
+
+        /* БАЗОВЫЕ СТИЛИ СТРАНИЦЫ */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         
-        /* Стили карты */
-        #map { width: 100%; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1;filter: invert(1) hue-rotate(180deg);}
-        
-        /* Скрываем любые всплывающие технические панели Яндекса, если они появятся */
-        .ymaps-2-1-79-route-panel, .ymaps-2-1-79-inputs-box {
+        body, html { 
+            width: 100%; 
+            height: 100%; 
+            font-family: 'Segoe UI', Helvetica, Arial, sans-serif; 
+            overflow: hidden; 
+            background-color: var(--bg-color); 
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* ТЕМНАЯ КАРТА (CSS-Фильтр как у клиента) */
+        body.dark-theme #map {
+            filter: invert(0.9) hue-rotate(180deg) brightness(0.9) contrast(1.2);
+            transition: filter 0.3s ease;
+        }
+
+        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+
+        /* СТИЛИ БУРГЕРА (Точная копия клиента) */
+        .burger-menu {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            width: 44px;
+            height: 44px;
+            background-color: var(--card-bg);
+            border: 1px solid var(--divider-color);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            z-index: 1000;
+            transition: background-color 0.3s, border-color 0.3s, transform 0.1s ease;
+        }
+
+        .burger-menu:active {
+            transform: scale(0.95); 
+        }
+
+        .burger-menu span {
+            display: block;
+            width: 20px;
+            height: 3px;
+            background-color: var(--text-color);
+            border-radius: 2px;
+            transition: 0.3s;
+        }
+
+        .burger-menu.sidebar-active {
             display: none !important;
         }
-        
+
+        /* СТИЛИ БОКОВОГО МЕНЮ (Точная копия клиента) */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 250px;
+            height: 100%;
+            background-color: var(--sidebar-bg);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            transition: 0.3s ease;
+            z-index: 1005;
+            padding: 20px;
+        }
+
+        .sidebar.active {
+            left: 0;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .close-btn {
+            font-size: 30px;
+            cursor: pointer;
+            color: var(--text-color);
+        }
+
+        .sidebar-links {
+            list-style: none;
+            padding: 0;
+        }
+
+        .sidebar-links li {
+            margin-bottom: 10px;
+        }
+
+        .sidebar-links li a {
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 18px;
+            display: block;
+            padding: 10px 0;
+        }
+
+        .menu-divider {
+            border: 0;
+            height: 1px;
+            background: var(--divider-color);
+            margin: 15px 0;
+        }
+
+        /* Переключатель тем */
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 16px;
+            color: var(--text-color);
+        }
+
+        .theme-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .theme-switch input { display: none; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        /* Оверлей бокового меню */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1004;
+            display: none;
+        }
+        .sidebar-overlay.show {
+            display: block;
+        }
+
+        /* Кнопка истории заказов в меню */
+        .history-toggle-btn {
+            background: none;
+            border: 1px solid var(--divider-color);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 16px;
+            color: var(--text-color);
+            cursor: pointer;
+            text-align: center;
+            margin: 5px 0;
+            font-weight: bold;
+            display: block;
+            width: 100%;
+            text-decoration: none;
+            outline: none;
+            transition: background-color 0.2s;
+        }
+        .history-toggle-btn:hover {
+            background-color: var(--input-bg);
+        }
+
+        .history-item {
+            padding: 10px;
+            border-bottom: 1px solid var(--divider-color);
+            font-size: 13px;
+            margin-top: 5px;
+            color: var(--text-color);
+            word-wrap: break-word;
+            white-space: normal;
+        }
+
         /* Главные кнопки смены */
         .shift-container { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; width: 90%; max-width: 420px; }
         .shift-btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 16px; font-weight: bold; color: white; cursor: pointer; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: background 0.2s; }
         .btn-go-online { background-color: #2d8b4e; } 
         .btn-go-offline { background-color: #b32d2d; } 
 
-        /* Бургер-меню */
-        .menu-trigger { position: absolute; top: 15px; left: 15px; z-index: 10; background: #151515; color: #15ff00; border: none; padding: 12px; border-radius: 8px; box-shadow: 0 0 10px 2px rgba(30, 255, 0, 0.942); cursor: pointer; font-size: 20px; }
-        .sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #151515; z-index: 20; transition: left 0.3s ease; box-shadow: 2px 0 5px rgba(30, 255, 0, 0.942); padding: 20px; box-sizing: border-box; }
-        .sidebar.open { left: 0; }
-        .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: 15; display: none; }
-        .sidebar-overlay.show { display: block; }
-        
-        /* Кнопка истории */
-        .history-toggle-btn { background: none; border: 1px solid #15ff00; padding: 10px; border-radius: 8px; font-size: 16px; color: #15ff00; cursor: pointer; text-align: center; margin: 15px 0 10px 0; font-weight: bold; display: block; text-decoration: none; outline: none; }
-        
-        /* ИЗМЕНЕНО: Добавлен принудительный перенос текста для элементов истории */
-        .history-item { padding: 10px; border-bottom: 1px solid #151515; font-size: 13px; margin-top: 5px; color: #15ff00; word-wrap: break-word; white-space: normal; }
-        
-        /* Карточка заказа */
-        .order-popup { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 420px; background: #151515; border-radius: 16px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 10; box-sizing: border-box; display: none; }
+        /* Карточка заказа (Соответствует стилю шторки клиента) */
+        .order-popup {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 420px;
+            background: var(--card-bg);
+            color: var(--text-color);
+            border-radius: 24px;
+            padding: 20px;
+            box-shadow: 0 -5px 30px rgba(0,0,0,0.15);
+            z-index: 10;
+            box-sizing: border-box;
+            display: none;
+            border: 1px solid var(--divider-color);
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
         .order-popup.show { display: block; }
         .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .order-id { font-size: 20px; font-weight: bold; color: #222; }
+        .order-id { font-size: 20px; font-weight: bold; color: var(--text-color); }
         .order-price { font-size: 20px; font-weight: bold; color: #28a745; }
         
-        /* ИЗМЕНЕНО: Добавлен принудительный перенос текста для адресов в окне заказа */
-        .address-block { margin-bottom: 8px; font-size: 14px; color: #444; line-height: 1.4; word-wrap: break-word; white-space: normal; }
+        .address-block { margin-bottom: 8px; font-size: 14px; color: var(--text-color); opacity: 0.9; line-height: 1.4; word-wrap: break-word; white-space: normal; }
         
-        .comment-box { margin-top: 10px; font-style: italic; color: #666; font-size: 13px; background: #f9f9f9; padding: 5px; border-radius: 4px; }
+        .comment-box { margin-top: 10px; font-style: italic; color: var(--text-color); opacity: 0.7; font-size: 13px; background: var(--input-bg); padding: 8px; border-radius: 8px; border: 1px solid var(--input-border); }
         
         /* Кнопки действий */
         .actions-group { display: flex; gap: 10px; margin-top: 15px; }
@@ -65,15 +293,38 @@
 </head>
 <body>
 
-    <button class="menu-trigger" onclick="toggleSidebar()">☰</button>
+    <div class="burger-menu" onclick="toggleSidebar()">
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+    
     <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
     <div id="sidebar" class="sidebar">
-        <h3 style="margin-bottom: 5px;">{{ request.user.first_name|default:"Имя курьера" }}</h3>
-        <p style="margin-top: 0; color: #555;">Мой баланс: <strong id="menuBalance">0</strong> ₽</p>
-        <hr>
-        <button class="history-toggle-btn" onclick="toggleHistory()">История заказов</button>
-        <div id="historyList" class="hidden"></div>
+        <div class="sidebar-header">
+            <h3>{{ request.user.first_name|default:"Курьер" }}</h3>
+            <span class="close-btn" onclick="toggleSidebar()">&times;</span>
+        </div>
+        
+        <p style="margin-top: -20px; margin-bottom: 20px; font-size: 15px; color: var(--text-color); opacity: 0.8;">
+            Баланс: <strong id="menuBalance" style="color: #28a745;">0</strong> ₽
+        </p>
+        
+        <ul class="sidebar-links">
+            <li>
+                <button class="history-toggle-btn" onclick="toggleHistory()">История заказов</button>
+                <div id="historyList" class="hidden"></div>
+            </li>
+            <hr class="menu-divider">
+            <li class="settings-item">
+                <span>Темная тема</span>
+                <label class="theme-switch">
+                    <input type="checkbox" id="theme-switch-btn" onchange="toggleTheme()">
+                    <span class="slider round"></span>
+                </label>
+            </li>
+        </ul>
     </div>
 
     <div id="map"></div>
@@ -117,21 +368,48 @@
         ymaps.ready(initMap);
 
         function initMap() {
-            // Центрируем на Гусев, вырезаем все стандартные элементы управления через controls: []
             yandexMap = new ymaps.Map("map", {
                 center: [54.5910, 22.1997],
                 zoom: 14,
-                controls: [] // Убирает поиск, слои, пробки, линейки и прочий мусор
+                controls: [] 
             });
         }
 
+        // Логика переключения меню (с согласованными классами клиента)
         function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebar').classList.toggle('active');
             document.getElementById('sidebarOverlay').classList.toggle('show');
-            if(document.getElementById('sidebar').classList.contains('open')) {
+            
+            const burger = document.querySelector('.burger-menu');
+            if (burger) {
+                burger.classList.toggle('sidebar-active');
+            }
+
+            if(document.getElementById('sidebar').classList.contains('active')) {
                 updateBalanceView();
             }
         }
+
+        // ПЕРЕКЛЮЧЕНИЕ ТЕМЫ (Точно как у клиента)
+        function toggleTheme() {
+            const body = document.body;
+            body.classList.toggle('dark-theme');
+            
+            const isDark = body.classList.contains('dark-theme');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            document.getElementById('theme-switch-btn').checked = isDark;
+        }
+
+        // ВОССТАНОВЛЕНИЕ ТЕМЫ ПРИ ЗАГРУЗКЕ
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme');
+            const themeBtn = document.getElementById('theme-switch-btn');
+            
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-theme');
+                if (themeBtn) themeBtn.checked = true;
+            }
+        });
 
         function toggleHistory() {
             const list = document.getElementById('historyList');
@@ -153,31 +431,29 @@
 
         function loadHistory() {
             const list = document.getElementById('historyList');
-            list.innerHTML = '<p style="font-size:12px; color:#999;">Загрузка...</p>';
+            list.innerHTML = '<p style="font-size:12px; color:#999; padding: 10px 0;">Загрузка...</p>';
             fetch('/courier/history/')
             .then(res => res.json())
             .then(data => {
                 list.innerHTML = '';
                 if(data.history.length === 0) {
-                    list.innerHTML = '<p style="padding:5px; color:#777; font-size:13px;">История пуста</p>';
+                    list.innerHTML = '<p style="padding:10px 0; color:#777; font-size:13px;">История пуста</p>';
                     return;
                 }
                 data.history.forEach(item => {
                     const div = document.createElement('div');
                     div.className = 'history-item';
-                    div.style.cursor = 'pointer'; // Делает визуально кликабельным
+                    div.style.cursor = 'pointer'; 
                     div.innerHTML = `
                         <strong>Заказ №${item.id} (+${item.final_price} ₽)</strong><br>
                         <span>${item.address_from} &rarr; ${item.address_to}</span>
                     `;
-                    // По клику на заказ открываем окно отчета
                     div.onclick = () => showHistoryReport(item);
                     list.appendChild(div);
                 });
             });
         }
 
-        // Функция для показа отчета из истории
         function showHistoryReport(order) {
             currentOrder = order;
             document.getElementById('popupOrderId').innerText = `Заказ №${order.id} (Архив)`;
@@ -188,33 +464,32 @@
             const commBox = document.getElementById('popupCommentBox');
             commBox.innerText = order.comment ? `Комментарий: "${order.comment}"` : '';
 
-            // Скрываем рабочие кнопки
             document.getElementById('initialActions').classList.add('hidden');
             document.getElementById('btnTransit').classList.add('hidden');
             document.getElementById('btnComplete').classList.add('hidden');
             document.getElementById('mapErrorInfo').style.display = 'none';
 
-            // Показываем кнопку "Назад"
             document.getElementById('btnBackToHistory').classList.remove('hidden');
 
-            // Сворачиваем бургер-меню
-            document.getElementById('sidebar').classList.remove('open');
+            // Сворачиваем бургер-меню и сбрасываем класс скрытия кнопки
+            document.getElementById('sidebar').classList.remove('active');
             document.getElementById('sidebarOverlay').classList.remove('show');
+            const burger = document.querySelector('.burger-menu');
+            if (burger) burger.classList.remove('sidebar-active');
 
-            // Показываем карточку заказа
             document.getElementById('orderPopup').classList.add('show');
         }
 
-        // Функция для кнопки "Назад"
         function goBackToHistory() {
-            // Закрываем окно заказа
             document.getElementById('orderPopup').classList.remove('show');
             document.getElementById('btnBackToHistory').classList.add('hidden');
             currentOrder = null;
 
-            // Возвращаем бургер-меню обратно
-            document.getElementById('sidebar').classList.add('open');
+            // Возвращаем сайдбар и скрываем бургер обратно
+            document.getElementById('sidebar').classList.add('active');
             document.getElementById('sidebarOverlay').classList.add('show');
+            const burger = document.querySelector('.burger-menu');
+            if (burger) burger.classList.add('sidebar-active');
         }
 
         function toggleShift() {
@@ -275,7 +550,6 @@
             document.getElementById('btnComplete').classList.add('hidden');
             document.getElementById('mapErrorInfo').style.display = 'none';
 
-            // Прячем кнопку "Назад", так как это новый заказ, а не из истории
             const btnBack = document.getElementById('btnBackToHistory');
             if (btnBack) btnBack.classList.add('hidden');
 
@@ -294,7 +568,6 @@
             }
         }
 
-        // Построение мультимаршрута Яндекса без текстовых панелей управления
         function showRouteOnMap() {
             const mapBtn = document.getElementById('mapBtn');
             const errorBlock = document.getElementById('mapErrorInfo');
@@ -305,27 +578,23 @@
             mapBtn.innerText = 'Строим...';
             errorBlock.style.display = 'none';
 
-            // Создаем встроенный Яндекс-маршрут
             currentRoute = new ymaps.multiRouter.MultiRoute({
                 referencePoints: [
                     currentOrder.address_from,
                     currentOrder.address_to
                 ],
                 params: {
-                    routingMode: 'auto' // Автомобильный маршрут
+                    routingMode: 'auto' 
                 }
             }, {
-                // Настройки отображения: отключаем системное меню маршрута, оставляем только линию
                 boundsAutoApply: true,
                 routeStrokeWidth: 5,
                 routeStrokeColor: "#007bff",
                 routeActiveStrokeColor: "#007bff"
             });
 
-            // Добавляем созданный маршрут на чистую карту
             yandexMap.geoObjects.add(currentRoute);
 
-            // Обработка успешного построения или падения
             currentRoute.model.events.add('requestsuccess', () => {
                 mapBtn.innerText = 'На карте';
             });

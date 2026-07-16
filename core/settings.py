@@ -115,4 +115,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+
+# 2. Список дополнительных папок, где Django должен искать статику
+STATICFILES_DIRS = [
+    BASE_DIR / "delivery" / "static", # Путь к твоей папке static внутри папки delivery
+]    
