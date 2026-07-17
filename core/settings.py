@@ -115,7 +115,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = '/static/'
+STATIC_URL = 'static/'
+
+# ДОБАВЬ ЭТУ СТРОКУ, она и нужна для collectstatic:
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # 2. Список дополнительных папок, где Django должен искать статику
 STATICFILES_DIRS = [
