@@ -1,0 +1,11 @@
+<form method="post">
+    {% csrf_token %}
+    
+    <!-- Вывод ошибки, если она есть -->
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <input type="password" name="password" placeholder="gbljh">
+    <button type="submit">Войти</button>
+</form>

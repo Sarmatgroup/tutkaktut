@@ -1,6 +1,6 @@
 import json
-from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Sum
 from django.utils import timezone
@@ -94,3 +94,16 @@ def update_status(request, order_id):
         except Order.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Заказ не найден'}, status=404)
     return JsonResponse({'status': 'error', 'message': 'Неверный метод'}, status=400)
+
+def login_gate_view(request):
+    error_message = None  # Изначально ошибки нет
+    
+    if request.method == 'POST':
+        if request.POST.get('password') == 'sapsan':
+            request.session['site_access'] = True
+            return redirect('/')
+        else:
+            error_message = "Неверный пароль, попробуйте еще раз."
+            
+    # Мы всегда возвращаем render, чтобы форма была видна
+    return render(request, 'login_gate.html', {'error': error_message})

@@ -7,6 +7,21 @@
     <title>ТутКакТут Доставка</title>
     <script src="https://api-maps.yandex.ru/2.1/?apikey=2edccfe7-7e65-461f-9472-0c1b7cf04983&lang=ru_RU" type="text/javascript"></script>
     <style>
+        .reset-btn { 
+    width: 100%; 
+    margin-top: 10px; 
+    padding: 14px; 
+    background: transparent; 
+    color: #64748b; 
+    border: 2px solid #e2e8f0; 
+    border-radius: 14px; 
+    font-size: 15px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    transition: 0.2s; 
+}
+.reset-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+
         /* Кнопка "Далее" */
 #map-action-btn {
     position: absolute;
@@ -360,6 +375,11 @@
         
         .content-section { display: block; }
         .hidden { display: none !important; }
+
+        /* Выносим подсказки Яндекса поверх всех элементов (шторки, меню и т.д.) */
+[class*="suggest-container"] {
+    z-index: 9999 !important;
+}
     </style>
 </head>
 <body>
@@ -394,7 +414,7 @@
         </li>
     </ul>
 </div>
- <!--<div id="map"></div>
+ <div id="map"></div>
 
 <div class="bottom-sheet" id="bottomSheet">
     <button type="button" id="map-action-btn" onclick="handleMapButtonClick()">Далее</button>
@@ -403,8 +423,8 @@
     <div class="content-section" id="formSection">
         <form id="orderForm">
             {% csrf_token %}
-            <input type="text" name="address_from" id="id_addr_from" placeholder="Откуда (перемещайте карту)" required readonly>
-            <input type="text" name="address_to" id="id_addr_to" placeholder="Куда (перемещайте карту)" required readonly>
+            <input type="text" name="address_from" id="id_addr_from" placeholder="Откуда (перемещайте карту)" required>
+            <input type="text" name="address_to" id="id_addr_to" placeholder="Куда (перемещайте карту)" required>
             <input type="hidden" name="distance" id="id_distance" value="0">
 
             <div class="tariffs-container">
@@ -421,7 +441,8 @@
             <input type="tel" name="client_phone" placeholder="Ваш номер телефона" required>
             <textarea name="comment" rows="2" placeholder="Комментарий курьеру"></textarea>
             
-            <button type="submit" class="submit-btn" id="submit_btn" disabled>Заказать</button>-->
+            <button type="submit" class="submit-btn" id="submit_btn" disabled>Заказать</button>
+            <button type="button" class="reset-btn" id="reset_btn" onclick="resetForm()">Сбросить</button>
             
         </form>
     </div>
@@ -753,6 +774,52 @@ ymaps.ready(function() {
             }
         });
     });
+
+    function resetForm() {
+    // 1. Сброс самой формы
+    document.getElementById('orderForm').reset();
+    document.getElementById('price_text').innerText = '0';
+    document.getElementById('dist_text').innerText = '';
+    document.getElementById('selected_tariff').value = '';
+    document.querySelectorAll('.tariff-btn').forEach(b => b.classList.remove('active'));
+    
+    let submitBtn = document.getElementById('submit_btn');
+    submitBtn.disabled = true; 
+    submitBtn.classList.remove('ready');
+
+    // 2. Сброс объектов карты
+    if (globalMap) {
+        if (placemarkFrom) globalMap.geoObjects.remove(placemarkFrom);
+        if (placemarkTo) globalMap.geoObjects.remove(placemarkTo);
+        if (activeRoute) globalMap.geoObjects.remove(activeRoute);
+        
+        placemarkFrom = null;
+        placemarkTo = null;
+        activeRoute = null;
+        
+        // Сброс координат
+        let center = globalMap.getCenter();
+        coordsFrom = center;
+        coordsTo = null;
+        
+        getAddress(center, function(addr) {
+            inputFrom.value = addr;
+        });
+    }
+    
+    // 3. Возврат интерфейса в исходное состояние
+    setActiveField('from');
+    document.getElementById('center-pin').classList.remove('hidden');
+    document.getElementById('bottomSheet').classList.remove('minimized');
+    
+    // ВАЖНО: Возвращаем кнопку "Далее" (она была скрыта в handleMapButtonClick)
+    const btn = document.getElementById('map-action-btn');
+    btn.style.display = 'block'; 
+    btn.innerText = 'Далее'; 
+    
+    // Скрываем крестик, если он был
+    document.getElementById('closeStatusBtn').classList.add('hidden');
+}
 
     // ОТСЛЕЖИВАНИЕ СТАТУСА (POLLING)
     function startStatusPolling(orderId) {
